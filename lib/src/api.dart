@@ -179,6 +179,8 @@ class NFC {
       /// This is ignored on Android as it does not have NFC modal
       String message = "",
 
+      Future Function(NDEFMessage) validationFun,
+
       /// readerMode specifies which mode the reader should use.
       NFCReaderMode readerMode = const NFCNormalReaderMode()}) {
     if (_tagStream == null) {
@@ -190,6 +192,15 @@ class NFC {
     int writes = 0;
     StreamSubscription<NFCMessage> stream = _tagStream.listen((msg) async {
       NDEFMessage message = msg;
+
+      try {
+        if (validationFun != null) {
+          await validationFun(message);
+        }
+      } catch (err) {
+        controller.addError(err);
+        return;
+      }
       if (message.tag.writable) {
         try {
           await message.tag.write(newMessage);
