@@ -106,43 +106,7 @@ class NFC {
     final subscription = stream.listen((message) {
       controller.add(message);
     }, onError: (error) {
-      if (error is PlatformException) {
-        switch (error.code) {
-          case "NDEFUnsupportedFeatureError":
-            controller.addError(NDEFReadingUnsupportedException());
-            controller.close();
-            return;
-          case "UserCanceledSessionError":
-            if (throwOnUserCancel)
-              controller.addError(NFCUserCanceledSessionException());
-            controller.close();
-            return;
-          case "SessionTimeoutError":
-            controller.addError(NFCSessionTimeoutException());
-            controller.close();
-            return;
-          case "SessionTerminatedUnexpectedlyErorr":
-            controller.addError(
-                NFCSessionTerminatedUnexpectedlyException(error.message));
-            controller.close();
-            return;
-          case "SystemIsBusyError":
-            controller.addError(NFCSystemIsBusyException(error.message));
-            controller.close();
-            return;
-          case "IOError":
-            controller.addError(NFCIOException(error.message));
-            if (error.details != null) {
-              assert(error.details is Map);
-              if (error.details["fatal"] == true) controller.close();
-            }
-            return;
-          case "NDEFBadFormatError":
-            controller.addError(NDEFBadFormatException(error.message));
-            return;
-        }
-      }
-      controller.addError(error);
+      _handleStreamError(error, controller, throwOnUserCancel);
     }, onDone: () {
       _tagStream = null;
       return controller.close();
@@ -161,6 +125,47 @@ class NFC {
     }
 
     return controller.stream;
+  }
+
+  static void _handleStreamError<T>(error, StreamController<T> controller, bool throwOnUserCancel) {
+    if (error is PlatformException) {
+      switch (error.code) {
+        case "NDEFUnsupportedFeatureError":
+          controller.addError(NDEFReadingUnsupportedException());
+          controller.close();
+          return;
+        case "UserCanceledSessionError":
+          if (throwOnUserCancel)
+            controller.addError(NFCUserCanceledSessionException());
+          controller.close();
+          return;
+        case "SessionTimeoutError":
+          controller.addError(NFCSessionTimeoutException());
+          controller.close();
+          return;
+        case "SessionTerminatedUnexpectedlyErorr":
+          controller.addError(
+              NFCSessionTerminatedUnexpectedlyException(error.message));
+          controller.close();
+          return;
+        case "SystemIsBusyError":
+          controller.addError(NFCSystemIsBusyException(error.message));
+          controller.close();
+          return;
+        case "IOError":
+          controller.addError(NFCIOException(error.message));
+          if (error.details != null) {
+            assert(error.details is Map);
+            if (error.details["fatal"] == true) controller.close();
+          }
+          return;
+        case "NDEFBadFormatError":
+          controller.addError(NDEFBadFormatException(error.message));
+          return;
+      }
+    }
+    controller.addError(error);
+    return;
   }
 
   /// writeNDEF will write [newMessage] to all NDEF compatible tags scanned while
@@ -215,6 +220,8 @@ class NFC {
       if (once && writes > 0) {
         controller.close();
       }
+    }, onError: (error) {
+      _handleStreamError(error, controller, false);
     }, onDone: () {
       _tagStream = null;
       return controller.close();
